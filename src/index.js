@@ -4,43 +4,49 @@ const fs = require('fs');
 const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
+const path = require('path');
 
-const docHtml = fs.readFileSync('./src/index.html', 'utf-8');
+const PORT = 8000;
 
-// Security: load the flag but never expose it publicly
-const flag = fs.readFileSync('./flag', 'utf-8').trim();
+// Securely load static HTML
+const docHtmlPath = path.join(__dirname, 'src', 'index.html');
+const docHtml = fs.readFileSync(docHtmlPath, 'utf-8');
 
-// Trust proxy if behind one (e.g., when deployed behind NGINX or on cloud platforms)
+// Load flag securely but do not expose it
+const flag = fs.readFileSync(path.join(__dirname, 'flag'), 'utf-8').trim();
+
+// Ensure Express trusts the real IP when behind a proxy (like NGINX or cloud)
 app.set('trust proxy', true);
 
 app.use(bodyParser.json());
 
-// Serve static HTML
+// Serve homepage
 app.get('/', (req, res) => {
     res.send(docHtml);
 });
 
-// Echo endpoint with improved security
+// Echo endpoint (sanitized)
 app.post('/echo', (req, res) => {
     const out = {
-        userID: req.ip,          // Trust Express IP if trust proxy is set
+        userID: req.ip,
         time: Date.now()
     };
 
-    // Whitelist input fields to avoid prototype pollution
-    const allowedFields = ['name', 'message'];
-    for (const field of allowedFields) {
-        if (typeof req.body[field] === 'string') {
-            out[field] = req.body[field];
+    // ✅ Whitelist fields from request body
+    const allowedFields = ['message', 'name', 'email'];
+    for (const key of allowedFields) {
+        if (typeof req.body[key] === 'string') {
+            out[key] = req.body[key];
         }
     }
 
-    // Do not expose secret flags
+    // ✅ Do NOT expose secret data like the flag
     out.flag = 'disabled';
 
     res.json(out);
 });
 
-app.listen(8000, () => {
-    console.log('Server listening on port 8000');
+// Start server
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
